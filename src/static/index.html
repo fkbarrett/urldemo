@@ -1,0 +1,203 @@
+<html>
+<head>
+    <title>URL shortener</title>
+    <script type="text/javascript">
+
+        BASE_URL = "http://127.0.0.1:8000"
+
+        function check_for_error_response(response) {
+            console.log("*** RESPONSE CHECK, response=", response)
+            if (!response.ok) {
+                console.log("*** RESPONSE NOT OK, text=" + response.statusText)
+                throw Error(response.statusText);
+            }
+            return response;
+        }
+
+        function postFormDataAsJson(url, obj) {
+            // POSTs form data as JSON
+            const body = JSON.stringify(obj);
+            const fetchOptions = {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Accept": "application/json"
+                },
+                body: body
+            };
+
+            fetch(url, fetchOptions)
+              .then(check_for_error_response)
+              .then(response => response.json())
+              .then(data => { display_result(data); })
+              .catch((error) => { display_error(error); });
+
+            return null;
+        }
+
+
+        function add_as_only_child(parent_elem, child_elem) {
+            while (parent_elem.firstChild) {
+              parent_elem.removeChild(parent_elem.firstChild);
+            }
+            parent_elem.appendChild(child_elem);
+        }
+
+        function display_result(result_data) {
+            // 
+            p_elem = document.getElementById("short_url_text");
+            if (!p_elem) {
+                return
+            }
+
+            url = BASE_URL + "/" + result_data.shortname;
+
+            const elem = document.createElement("a");
+            elem.setAttribute("href", url); 
+            elem.setAttribute("target", "_blank"); 
+            elem.innerText = url;
+
+            add_as_only_child(p_elem, elem)
+        }
+
+
+        function display_error(error_data) {
+            p_elem = document.getElementById("short_url_text");
+            if (!p_elem) {
+                return
+            }
+
+            const elem = document.createElement("p");
+            elem.setAttribute("class", "error_text"); 
+            elem.innerText = error_data;
+
+            add_as_only_child(p_elem, elem)
+        }
+
+        function validate_url(url) {
+            // make sure the URL is valid
+            // return the normalized URL if it OK, otherwise undefined
+            try {
+                url = new URL(url);
+                if (url.protocol.startsWith("http") || url.protocol.startsWith("http")) {
+                    return url.href;
+                }
+            } catch (_exc) {
+               console.log("EXC:", _exc)
+               return undefined;
+            }
+        }
+
+        function handle_form() {
+            url_elem = document.getElementById("url");
+            name_elem = document.getElementById("shortname");
+            exp_elem = document.getElementById("expiration");
+
+            url = url_elem ? url_elem.value.trim() : null;
+            name = name_elem ? name_elem.value.trim() : null;
+            expiration = exp_elem ? exp_elem.value.trim() : null;
+
+            url = validate_url(url)
+            if (!url) {
+                display_error("Not a valid URL")
+                return
+            }
+            if (name && (name.length < 5 || name.length > 40)) {
+                display_error("Short name must be between 5 and 40 characters long")
+                return
+            }
+            if (expiration && (expiration.length < 1 || expiration.length > 7 || ! /^\d+$/.test(expiration))) {
+                display_error("Expiration time must be a valid number")
+                return
+            }
+
+            postFormDataAsJson(BASE_URL + "/url", { "url": url, "key": name, "expiration_min": expiration })
+        }
+    </script>
+    <style type="text/css">
+        * {
+            width: 100%;
+            font-size: 20px;
+            margin: 12px;
+            font-family: sans-serif;
+        }
+
+        .shorturl form {
+            width: 80%;
+        }
+
+        .shorturl .form_label {
+            display: inline-block;  
+            width:  210px;
+            text-align: right;
+            margin-right: 0;
+        }
+
+        .shorturl input {
+            width:  20%;
+            min-width: 400px;
+        }
+
+        .help_text {
+            margin-left: 250px;
+            margin-top: 0;
+            width: 100%;
+            font-style: italic;
+            color: grey;
+        }
+
+        .shorturl #url {
+            width:  35%;
+        }
+
+        .shorturl button {
+            width: 200px;
+            background-color: green;
+            color: white;
+        }
+
+        .error_text {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+
+<div>
+    <div id="shorten_form">
+
+        <div class="shorturl">
+            <p>Enter URL to shorten</p>
+            <div>
+                <label class="form_label" for="url">URL:</label>
+                <input type="text" id="url" name="url">
+            </div>
+
+            <div>
+                <label class="form_label" for="shortname">Shortname:</label>
+                <input type="text" id="shortname" name="shortname"><br>
+                <label class="help_text">5 to 40 characters (optional)</label>
+            </div>
+
+            <div>
+                <label class="form_label" for="expiration">Expiration in minutes:</label>
+                <input type="text" id="expiration" name="expiration"></textarea><br>
+                <label class="help_text">(optional)</label>
+            </div>
+
+            <div>
+                <button type="submit" onclick="handle_form();">Shorten URL</button>
+            </div>
+         </ul>
+        </form>
+    </div>
+
+    <div>
+        <div>
+            <p>Short URL is</p><p id="short_url_text"></p>
+        </div>
+    </div>
+
+</div>
+</body>
+</html>
