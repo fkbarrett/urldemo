@@ -6,9 +6,7 @@
         BASE_URL = "http://127.0.0.1:8000"
 
         function check_for_error_response(response) {
-            console.log("*** RESPONSE CHECK, response=", response)
             if (!response.ok) {
-                console.log("*** RESPONSE NOT OK, text=" + response.statusText)
                 throw Error(response.statusText);
             }
             return response;
@@ -83,7 +81,6 @@
                     return url.href;
                 }
             } catch (_exc) {
-               console.log("EXC:", _exc)
                return undefined;
             }
         }
@@ -93,9 +90,9 @@
             name_elem = document.getElementById("shortname");
             exp_elem = document.getElementById("expiration");
 
-            url = url_elem ? url_elem.value.trim() : null;
-            name = name_elem ? name_elem.value.trim() : null;
-            expiration = exp_elem ? exp_elem.value.trim() : null;
+            url = url_elem ? url_elem.value.trim() : null
+            name = name_elem ? name_elem.value.trim() : null
+            expiration = exp_elem ? exp_elem.value.trim() : null
 
             url = validate_url(url)
             if (!url) {
@@ -109,6 +106,9 @@
             if (expiration && (expiration.length < 1 || expiration.length > 7 || ! /^\d+$/.test(expiration))) {
                 display_error("Expiration time must be a valid number")
                 return
+            }
+            else if (!expiration) {
+                expiration = null
             }
 
             postFormDataAsJson(BASE_URL + "/url", { "url": url, "key": name, "expiration_min": expiration })

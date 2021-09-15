@@ -28,6 +28,9 @@ class MemoryKeyValueStore(KeyValueStore):
     # does not accept null keys or values
 
     def __init__(self, default_exptime_seconds=ONE_WEEK_IN_SECONDS):
+        """
+        Constructor - takes default cache expiration time (in seconds) as optional argument.
+        """
 
         # maps key to (string,expiration_time) tuple
         self.key_to_str_and_exptime = {}
@@ -38,14 +41,16 @@ class MemoryKeyValueStore(KeyValueStore):
         # used to clear expired keys
         self.expiration_heap = []
 
+        # async lock
         self.lock = asyncio.Lock()
-
 
 
     @staticmethod
     def _isexpired(exptime):
-        return exptime > time.time()
-
+        """
+        Helper method - check if the given time has passed
+        """
+        return exptime < time.time()
 
 
     async def _delete_key(self, key):
@@ -138,6 +143,7 @@ class MemoryKeyValueStore(KeyValueStore):
         Stores the key with the given string value.
         It expires in exptime_seconds seconds (default_exptime_seconds if not supplied).
         Returns True on success, False if the key exists with a different value.
+        Changes to expiration on an existing key are ignored.
         Raises an exception if called with an invalid key or value.
         """
         if not key:
@@ -149,7 +155,7 @@ class MemoryKeyValueStore(KeyValueStore):
 
         if not exptime_seconds:
             exptime_seconds = self.default_exptime_seconds
-        elif self._isexpired(exptime_seconds):
+        elif self._isexpired(time.time() + exptime_seconds):
             raise KeyError("cache expiration time has passed")
 
         # do some garbage collection of expired keys
@@ -159,7 +165,7 @@ class MemoryKeyValueStore(KeyValueStore):
         str_and_exptime = await self._lookup_with_exptime(key)
         if str_and_exptime:
             # found the key
-            existing_stringval, existing_exptime = str_and_exptime
+            existing_stringval, _existing_exptime = str_and_exptime
             if existing_stringval == stringval:
                 # the key already exists with this value
                 return True  # no need to do anything else
@@ -169,7 +175,7 @@ class MemoryKeyValueStore(KeyValueStore):
                 return False
 
         # doesn't exist, do the insert
-        self.key_to_str_and_exptime[key] = (stringval, exptime_seconds)
+        self.key_to_str_and_exptime[key] = (stringval, exptime_seconds + time.time())
         return True
 
 
@@ -179,30 +185,41 @@ async def test():
     """
     cache = MemoryKeyValueStore()
     val = await cache.lookup("test")
-    print("val=%s" % val)
+    print("Lookup non-existent key: val=%s (expect None)" % val)
 
-    val = await cache.store("test", "abc")
-    print("val=%s" % val)
+    val = await cache.store("test1", "abc")
+    print("store test1:  val=%s" % val)
 
-    val = await cache.lookup("test")
-    print("val=%s" % val)
+    val = await cache.lookup("test1")
+    print("lookup test1: val=%s" % val)
 
     val = await cache.store("test2", "efgh")
-    print("val=%s" % val)
-
-    val = await cache.lookup("test")
-    print("val=%s" % val)
+    print("store test2:  val=%s" % val)
 
     val = await cache.lookup("test2")
-    print("val=%s" % val)
+    print("lookup test2: val=%s" % val)
 
-    val = await cache.store("test2", "efgh2")
-    print("val=%s" % val)
+    val = await cache.store("test3", "efgh2")
+    print("store test3:  val=%s" % val)
 
-    val = await cache.store("test2", "efgh")
-    print("val=%s" % val)
+    # this should fail, key already exists
+    val = await cache.store("test3", "efgh3")
+    print("store different test3: val=%s (expect False)" % val)
+
+    # test for expiration
+    val = await cache.store("test4", "ijkl", 2)
+    print("store test4:  val=%s" % val)
+
+    val = await cache.lookup("test4")
+    print("lookup test4: val=%s" % val)
+
+    await asyncio.sleep(3)
+
+    val = await cache.lookup("test4")
+    print("lookup test4 after sleep: val=%s (expect None)" % val)
 
     try:
+        print("Test to catch exception for None value...")
         val = await cache.store("test3", None)
     except KeyError as keyexc:
         print("Caught key error '%s'" % keyexc)
