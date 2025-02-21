@@ -17,3 +17,4 @@ Tests (such as pytest scripts) would go in the tests directory.
 There are no tests there now (but some Python files have tests at the bottom that can be run as main).
 
 The app can be run from the main directory by executing the `run.sh` shell script.
+test
